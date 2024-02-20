@@ -1,20 +1,13 @@
 import os
 import numpy as np
 from matplotlib import pyplot as plt
-import scipy.io
-from scipy.interpolate import griddata
 import time
-import math
-from idaes.surrogate.pysmo.sampling import HammersleySampling
-from matplotlib import cm
-from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import torch
-import torch.autograd as autograd         # computation graph
-from torch import Tensor                  # tensor node in the computation graph
 import torch.nn as nn                     # neural networks
 import torch.optim as optim               # optimizers e.g. gradient descent, ADAM, etc.
 from torch.nn.parameter import Parameter
 from vtk_to_files import var_to_polyvtk
+from modulus.geometry.tessellation import Tessellation
 
 # System settings
 torch.set_default_dtype(torch.float)
@@ -39,6 +32,21 @@ def get_parameter_number(net):
     total_num = sum(p.numel() for p in net.params)
     trainable_num = sum(p.numel() for p in net.params if p.requires_grad)
     return trainable_num
+
+# generate dataset from stl model
+def load_data(num_domain, num_boundary):
+    # select points from the interior and boundary of the model
+    geo = Tessellation.from_stl(path + '../stl_model/knot_mesh.stl')
+    interior = geo.sample_interior(num_domain)
+    interior_points = np.c_[interior['x'],interior['y'],interior['z']]
+    boundary = geo.sample_boundary(num_boundary)
+    boundary_points = np.c_[boundary['x'],boundary['y'],boundary['z']]
+    # Integrate data
+    X_train = np.concatenate([interior_points, boundary_points], 0)
+    Y_train = solution(X_train[:,0], X_train[:,1], X_train[:,2])
+    Y_train = Y_train.reshape(Y_train.shape[0], 1)
+
+    return X_train, Y_train
 
 # generate dataset
 def load_data_file(X_train_interior_path, X_train_boundary_path, num_domain, num_boundary):
@@ -181,7 +189,7 @@ if __name__ == "__main__":
         num_boundary = 4000
         num_domain_test = 10000
         num_boundary_test = 10000
-        epochs = 5000 # Number of Adam optimizer iterations
+        epochs = 10000 # Number of Adam optimizer iterations
         Layers = [3, 512, 512, 512, 512, 512, 1] # fully connected neural network structure
         learning_rate = 0.001 
         shuffle = False
@@ -203,6 +211,8 @@ if __name__ == "__main__":
         name = name + ("_%d" % epochs)
         print("***** name = %s *****" % name)
         print("seed = %d" % seed)
+        output_path = path + ('../output')
+        if not os.path.exists(output_path): os.mkdir(output_path)
         output_path = path + ('../output/%s/' % name)
         if not os.path.exists(output_path): os.mkdir(output_path)
         output_path = path + ('../output/%s/train_%d/' % (name, seed))
@@ -212,7 +222,8 @@ if __name__ == "__main__":
         if train:
             # generate train set
             print("Generating train set!")
-            X_train_np, Y_train_np = load_data_file(X_train_interior_path, X_train_boundary_path, num_domain, num_boundary)
+            # X_train_np, Y_train_np = load_data_file(X_train_interior_path, X_train_boundary_path, num_domain, num_boundary)
+            X_train_np, Y_train_np = load_data(num_domain, num_boundary)
             lb_X = X_train_np.min(0)
             ub_X = X_train_np.max(0)
             X_train = torch.from_numpy(X_train_np).float().to(device)
@@ -220,7 +231,8 @@ if __name__ == "__main__":
             
             # generate test set
             print("Generating test set!")
-            X_test_np, Y_test_np = load_data_file(X_train_interior_path, X_train_boundary_path, num_domain_test, num_boundary_test)
+            # X_test_np, Y_test_np = load_data_file(X_train_interior_path, X_train_boundary_path, num_domain_test, num_boundary_test)
+            X_test_np, Y_test_np = load_data(num_domain_test, num_boundary_test)
             X_test = torch.from_numpy(X_test_np).float().to(device)
             Y_test = torch.from_numpy(Y_test_np).float().to(device)
 
@@ -281,7 +293,8 @@ if __name__ == "__main__":
             print("min_loss = %.8f" % min_loss)
         else:
             print("Generating test set!")
-            X_test_np, Y_test_np = load_data_file(X_train_interior_path, X_train_boundary_path, num_domain_test, num_boundary_test)
+            # X_test_np, Y_test_np = load_data_file(X_train_interior_path, X_train_boundary_path, num_domain_test, num_boundary_test)
+            X_test_np, Y_test_np = load_data(num_domain_test, num_boundary_test)
             X_test = torch.from_numpy(X_test_np).float().to(device)
             Y_test = torch.from_numpy(Y_test_np).float().to(device)
 
@@ -309,8 +322,8 @@ if __name__ == "__main__":
 
         # save u_pred to a vtp file
         u_vtp = {'x': X_test_np[:, 0:1], 'y': X_test_np[:, 1:2], 'z': X_test_np[:, 2:3], 'u_pred': u_pred}
-        var_to_polyvtk(u_vtp, output_path + "u_pred_fc_boundary4e6") 
+        var_to_polyvtk(u_vtp, output_path + "u_pred_PINN") 
 
         # save u_truth to a vtp file
         u_vtp = {'x': X_test_np[:, 0:1], 'y': X_test_np[:, 1:2], 'z': X_test_np[:, 2:3], 'u_true': u_truth}
-        var_to_polyvtk(u_vtp, output_path + "u_true_boundary4e6") 
+        var_to_polyvtk(u_vtp, output_path + "u_true") 

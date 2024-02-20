@@ -1,7 +1,6 @@
 import os
 import numpy as np
 from matplotlib import pyplot as plt
-from scipy.interpolate import griddata
 import time
 import torch
 import torch.nn as nn                     # neural networks
@@ -34,7 +33,22 @@ def get_parameter_number(net):
     trainable_num = sum(p.numel() for p in net.params if p.requires_grad)
     return trainable_num
 
-# generate dataset
+# generate dataset from stl model
+def load_data(num_domain, num_boundary):
+    # select points from the interior and boundary of the model
+    geo = Tessellation.from_stl(path + '../stl_model/knot_mesh.stl')
+    interior = geo.sample_interior(num_domain)
+    interior_points = np.c_[interior['x'],interior['y'],interior['z']]
+    boundary = geo.sample_boundary(num_boundary)
+    boundary_points = np.c_[boundary['x'],boundary['y'],boundary['z']]
+    # Integrate data
+    X_train = np.concatenate([interior_points, boundary_points], 0)
+    Y_train = solution(X_train[:,0], X_train[:,1], X_train[:,2])
+    Y_train = Y_train.reshape(Y_train.shape[0], 1)
+
+    return X_train, Y_train
+
+# generate dataset from file
 def load_data_file(X_train_interior_path, X_train_boundary_path, num_domain, num_boundary):
     interior = np.loadtxt(X_train_interior_path, dtype = float, delimiter=' ')
     np.random.shuffle(interior)
@@ -48,9 +62,9 @@ def load_data_file(X_train_interior_path, X_train_boundary_path, num_domain, num
 
     return X_train, Y_train
 
-class PINN(nn.Module):
+class BsPINN(nn.Module):
     def __init__(self, Layers, kappa, num_domain, boundary_weight, lb_X, ub_X):
-        super(PINN, self).__init__()
+        super(BsPINN, self).__init__()
         # initialize parameters
         self.mode = "train"
         self.kappa = kappa
@@ -106,7 +120,7 @@ class PINN(nn.Module):
         # the first hidden layer
         num_Layers = len(self.Layers)
         l_out = torch.sin(torch.add(torch.matmul(H, self.weights[0][0]), self.biases[0][0]))
-        temp = [[] for i in range(num_Layers - 2)]# tempSave the outputs of each hidden layer.
+        temp = [[] for i in range(num_Layers - 2)]# save the outputs of each hidden layer.
         temp[0].append(l_out)
         # the following hidden layer
         for l in range(1,num_Layers-2):
@@ -195,7 +209,7 @@ if __name__ == "__main__":
         num_boundary = 4000
         num_domain_test = 10000
         num_boundary_test = 10000
-        epochs = 5000 # Number of Adam optimizer iterations
+        epochs = 10000 # Number of Adam optimizer iterations
         Layers = [3, 512, 256, 128, 64, 32, 1] # binary structured neural network structure
         learning_rate = 0.001 
         shuffle = False
@@ -217,6 +231,8 @@ if __name__ == "__main__":
         name = name + ("_%d" % epochs)
         print("***** name = %s *****" % name)
         print("seed = %d" % seed)
+        output_path = path + ('../output')
+        if not os.path.exists(output_path): os.mkdir(output_path)
         output_path = path + ('../output/%s/' % name)
         if not os.path.exists(output_path): os.mkdir(output_path)
         output_path = path + ('../output/%s/train_%d/' % (name, seed))
@@ -226,7 +242,8 @@ if __name__ == "__main__":
         if train:
             # generate train set
             print("Generating train set!")
-            X_train_np, Y_train_np = load_data_file(X_train_interior_path, X_train_boundary_path, num_domain, num_boundary)
+            # X_train_np, Y_train_np = load_data_file(X_train_interior_path, X_train_boundary_path, num_domain, num_boundary)
+            X_train_np, Y_train_np = load_data(num_domain, num_boundary)
             lb_X = X_train_np.min(0)
             ub_X = X_train_np.max(0)
             X_train = torch.from_numpy(X_train_np).float().to(device)
@@ -234,12 +251,13 @@ if __name__ == "__main__":
             
             # generate test set
             print("Generating test set!")
-            X_test_np, Y_test_np = load_data_file(X_train_interior_path, X_train_boundary_path, num_domain_test, num_boundary_test)
+            # X_test_np, Y_test_np = load_data_file(X_train_interior_path, X_train_boundary_path, num_domain_test, num_boundary_test)
+            X_test_np, Y_test_np = load_data(num_domain_test, num_boundary_test)
             X_test = torch.from_numpy(X_test_np).float().to(device)
             Y_test = torch.from_numpy(Y_test_np).float().to(device)
 
             # Declare neural network instance
-            model = PINN(Layers, kappa, num_domain, boundary_weight, lb_X, ub_X)
+            model = BsPINN(Layers, kappa, num_domain, boundary_weight, lb_X, ub_X)
             model = nn.DataParallel(model)
             model = model.module
             model.to(device)
@@ -295,7 +313,8 @@ if __name__ == "__main__":
             print("min_loss = %.8f" % min_loss)
         else:
             print("Generating test set!")
-            X_test_np, Y_test_np = load_data_file(X_train_interior_path, X_train_boundary_path, num_domain_test, num_boundary_test)
+            # X_test_np, Y_test_np = load_data_file(X_train_interior_path, X_train_boundary_path, num_domain_test, num_boundary_test)
+            X_test_np, Y_test_np = load_data(num_domain_test, num_boundary_test)
             X_test = torch.from_numpy(X_test_np).float().to(device)
             Y_test = torch.from_numpy(Y_test_np).float().to(device)
 
@@ -323,4 +342,4 @@ if __name__ == "__main__":
 
         # save u_pred to a vtp file
         u_vtp = {'x': X_test_np[:, 0:1], 'y': X_test_np[:, 1:2], 'z': X_test_np[:, 2:3], 'u_pred': u_pred}
-        var_to_polyvtk(u_vtp, output_path + "u_pred_bfc_boundary4e6") 
+        var_to_polyvtk(u_vtp, output_path + "u_pred_BsPINN") 
