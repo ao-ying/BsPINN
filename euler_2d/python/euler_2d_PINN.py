@@ -225,11 +225,12 @@ class PINN(nn.Module):
 
 # main
 if __name__ == "__main__":
-    seeds = [11]
+    seeds = [19]
     for seed in seeds:
         print("***** seed = %d *****" % seed)
         np.random.seed(seed)
         torch.manual_seed(seed)
+        
         # parameter settings
         ## equation related
         gamma = 1.4
@@ -241,6 +242,7 @@ if __name__ == "__main__":
         ub_t = 2
         
         ## Neural network related
+        train = True
         name = "euler_2d_5*256"
         Nf = 10000 # number of training points corresponding to governing equations
         N0 = 400 # number of training points corresponding to initial condition
@@ -254,7 +256,6 @@ if __name__ == "__main__":
         weight_decay = 0 
         
         ## draw related
-        train = True
         align = False
         lb_loss = 1e-5
         ub_loss = 1e4
@@ -265,11 +266,11 @@ if __name__ == "__main__":
         name = name + ("_%d" % epochs)
         print("\n\n***** name = %s *****" % name)
         print("seed = %d" % seed)
-        output_path = path + ('../output')
+        output_path = path + ('./output')
         if not os.path.exists(output_path): os.mkdir(output_path)
-        output_path = path + ('../output/%s' % name)
+        output_path = path + ('./output/%s' % name)
         if not os.path.exists(output_path): os.mkdir(output_path)
-        output_path = path + ('../output/%s/train_%d/' % (name, seed))
+        output_path = path + ('./output/%s/train_%d/' % (name, seed))
         if not os.path.exists(output_path): os.mkdir(output_path)
         
         if train:

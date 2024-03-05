@@ -48,20 +48,6 @@ def load_data(num_domain, num_boundary):
 
     return X_train, Y_train
 
-# generate dataset from file
-def load_data_file(X_train_interior_path, X_train_boundary_path, num_domain, num_boundary):
-    interior = np.loadtxt(X_train_interior_path, dtype = float, delimiter=' ')
-    np.random.shuffle(interior)
-    interior = interior[0:num_domain]
-    boundary = np.loadtxt(X_train_boundary_path, dtype = float, delimiter=' ')
-    np.random.shuffle(boundary)
-    boundary = boundary[0:num_boundary]
-    X_train = np.concatenate([interior, boundary], 0)
-    Y_train = solution(X_train[:,0], X_train[:,1], X_train[:,2])
-    Y_train = Y_train.reshape(Y_train.shape[0], 1)
-
-    return X_train, Y_train
-
 class BsPINN(nn.Module):
     def __init__(self, Layers, kappa, num_domain, boundary_weight, lb_X, ub_X):
         super(BsPINN, self).__init__()
@@ -196,7 +182,7 @@ class BsPINN(nn.Module):
     
 # main
 if __name__ == "__main__":
-    seeds = [11]
+    seeds = [13]
     for seed in seeds:
         # seed
         np.random.seed(seed)
@@ -212,13 +198,10 @@ if __name__ == "__main__":
         epochs = 10000 # Number of Adam optimizer iterations
         Layers = [3, 512, 256, 128, 64, 32, 1] # binary structured neural network structure
         learning_rate = 0.001 
-        shuffle = False
         boundary_weight = 1
         patience = max(10, epochs/10)
         weight_decay = 0
         min_lr = 0
-        X_train_interior_path = path + "../stl_model/interior_1e5.txt" 
-        X_train_boundary_path = path + "../stl_model/boundary_1e7.txt"
         train = True
         align = False
         lb_loss = 1e-2
@@ -231,18 +214,17 @@ if __name__ == "__main__":
         name = name + ("_%d" % epochs)
         print("***** name = %s *****" % name)
         print("seed = %d" % seed)
-        output_path = path + ('../output')
+        output_path = path + ('./output')
         if not os.path.exists(output_path): os.mkdir(output_path)
-        output_path = path + ('../output/%s/' % name)
+        output_path = path + ('./output/%s/' % name)
         if not os.path.exists(output_path): os.mkdir(output_path)
-        output_path = path + ('../output/%s/train_%d/' % (name, seed))
+        output_path = path + ('./output/%s/train_%d/' % (name, seed))
         if not os.path.exists(output_path): os.mkdir(output_path)
 
         # train
         if train:
             # generate train set
-            print("Generating train set!")
-            # X_train_np, Y_train_np = load_data_file(X_train_interior_path, X_train_boundary_path, num_domain, num_boundary)
+            print("Generating train set! This will take a few minutes.")
             X_train_np, Y_train_np = load_data(num_domain, num_boundary)
             lb_X = X_train_np.min(0)
             ub_X = X_train_np.max(0)
@@ -251,7 +233,6 @@ if __name__ == "__main__":
             
             # generate test set
             print("Generating test set!")
-            # X_test_np, Y_test_np = load_data_file(X_train_interior_path, X_train_boundary_path, num_domain_test, num_boundary_test)
             X_test_np, Y_test_np = load_data(num_domain_test, num_boundary_test)
             X_test = torch.from_numpy(X_test_np).float().to(device)
             Y_test = torch.from_numpy(Y_test_np).float().to(device)
@@ -312,8 +293,7 @@ if __name__ == "__main__":
             print("params = %d" % params)
             print("min_loss = %.8f" % min_loss)
         else:
-            print("Generating test set!")
-            # X_test_np, Y_test_np = load_data_file(X_train_interior_path, X_train_boundary_path, num_domain_test, num_boundary_test)
+            print("Generating test set! This will take a few minutes.")
             X_test_np, Y_test_np = load_data(num_domain_test, num_boundary_test)
             X_test = torch.from_numpy(X_test_np).float().to(device)
             Y_test = torch.from_numpy(Y_test_np).float().to(device)
@@ -331,7 +311,7 @@ if __name__ == "__main__":
             plt.savefig(output_path + 'loss.pdf', format="pdf", dpi=300, bbox_inches="tight")
 
         # calculate u_pred and u_truth
-        u_truth = solution(X_test_np[:,0], X_test_np[:,1], X_test_np[:,2])
+        u_truth = Y_test_np.flatten()
         model2 = torch.load(output_path + 'network.pkl', map_location=device) 
         model2.set_mode('test') # Be sure to change to test mode when predicting on CPU
         u_pred = model2.predict(X_test).flatten()
@@ -343,3 +323,7 @@ if __name__ == "__main__":
         # save u_pred to a vtp file
         u_vtp = {'x': X_test_np[:, 0:1], 'y': X_test_np[:, 1:2], 'z': X_test_np[:, 2:3], 'u_pred': u_pred}
         var_to_polyvtk(u_vtp, output_path + "u_pred_BsPINN") 
+        
+        # save u_truth to a vtp file
+        u_vtp = {'x': X_test_np[:, 0:1], 'y': X_test_np[:, 1:2], 'z': X_test_np[:, 2:3], 'u_true': u_truth}
+        var_to_polyvtk(u_vtp, output_path + "u_true") 

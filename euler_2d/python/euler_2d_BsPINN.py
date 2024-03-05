@@ -128,7 +128,7 @@ class BsPINN(nn.Module):
         X = 2.0 * (X - self.lb_X) / (self.ub_X - self.lb_X) - 1.0
         H = X.float()
         
-         # the first hidden layer
+        # the first hidden layer
         num_Layers = len(self.Layers)
         l_out = torch.tanh(torch.add(torch.matmul(H, self.weights[0][0]), self.biases[0][0]))
         temp = [[] for i in range(num_Layers - 2)]# save the outputs of each hidden layer.
@@ -240,7 +240,7 @@ class BsPINN(nn.Module):
 
 # main
 if __name__ == "__main__":
-    seeds = [11]
+    seeds = [19]
     for seed in seeds:
         print("***** seed = %d *****" % seed)
         np.random.seed(seed)
@@ -256,11 +256,12 @@ if __name__ == "__main__":
         ub_t = 2
         
         ## Neural network related
+        train = True
         name = "euler_2d_256-16"
         Nf = 10000 # number of training points corresponding to governing equations
         N0 = 400 # number of training points corresponding to initial condition
         Nb = 100 # number of training points 
-        epochs = 5000 # adam优化器迭代次数
+        epochs = 5000 # Number of Adam optimizer iterations
         Layers = [3,256,128,64,32,16,5] # binary structured neural network structure
         learning_rate = 0.001
         patience = max(10, epochs / 10) # patience for decaying learning rate
@@ -269,7 +270,6 @@ if __name__ == "__main__":
         weight_decay = 0 
         
         ## draw related
-        train = True
         align = False
         lb_loss = 1e-5
         ub_loss = 1e4
@@ -280,11 +280,11 @@ if __name__ == "__main__":
         name = name + ("_%d" % epochs)
         print("\n\n***** name = %s *****" % name)
         print("seed = %d" % seed)
-        output_path = path + ('../output')
+        output_path = path + ('./output')
         if not os.path.exists(output_path): os.mkdir(output_path)
-        output_path = path + ('../output/%s' % name)
+        output_path = path + ('./output/%s' % name)
         if not os.path.exists(output_path): os.mkdir(output_path)
-        output_path = path + ('../output/%s/train_%d/' % (name, seed))
+        output_path = path + ('./output/%s/train_%d/' % (name, seed))
         if not os.path.exists(output_path): os.mkdir(output_path)
 
         if train:
@@ -420,3 +420,19 @@ if __name__ == "__main__":
             plt.savefig(output_path + "r_pred_aligned.png", format="png", dpi=300, bbox_inches="tight")
         else:
             plt.savefig(output_path + "r_pred.png", format="png", dpi=300, bbox_inches="tight")
+            
+        # draw the image of exact solution
+        fig, ax = plt.subplots()
+        if align:
+            levels = np.arange(lb_r, ub_r, (ub_r - lb_r) / 100)
+        else:
+            levels = np.arange(min(r_truth) - abs(max(r_truth) - min(r_truth)) / 10, max(r_truth) + abs(max(r_truth) - min(r_truth)) / 10, (max(r_truth) - min(r_truth)) / 100) 
+        cs = ax.contourf(X.reshape(dim, dim), Y.reshape(dim, dim), r_truth.reshape(dim, dim), levels,cmap=plt.get_cmap('Spectral'))
+        cbar = fig.colorbar(cs)
+        plt.xlabel('$x$')
+        plt.ylabel('$y$')
+        plt.title('$r$(truth) when t=1s')
+        if align:
+            plt.savefig(output_path + "r_truth_aligned.png", format="png", dpi=300, bbox_inches="tight")
+        else:
+            plt.savefig(output_path + "r_truth.png", format="png", dpi=300, bbox_inches="tight")
