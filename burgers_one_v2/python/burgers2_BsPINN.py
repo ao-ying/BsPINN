@@ -188,29 +188,6 @@ class BsPINN(nn.Module):
         X = torch.add(torch.matmul(X, W), b)
         return X
 
-    def neural_net_channel(self, X, channel):
-        # Data preprocessing
-        X = 2.0 * (X - self.lb_X) / (self.ub_X - self.lb_X) - 1.0
-        H = X.float()
-
-        # First hidden layer
-        num_Layers = len(self.Layers)
-        l_out = torch.sin(torch.add(torch.matmul(H, self.weights[0][0]), self.biases[0][0]))
-        temp = [[] for i in range(num_Layers - 2)] # temp stores the output results of each network layer
-        temp[0].append(l_out)
-        # Subsequent hidden layers
-        for l in range(1, num_Layers - 2):
-            for i in range(int(pow(2, l))):
-                W = self.weights[l][i]
-                b = self.biases[l][i]
-                l_out = torch.sin(torch.add(torch.matmul(temp[l - 1][int(i / 2)], W), b))
-                temp[l].append(l_out)
-        # Last fully connected layer
-        out = torch.zeros(X.shape[0], self.Layers[1]).to(device)
-        out[:, self.Layers[-2] * channel : self.Layers[-2] * (channel + 1)] = temp[num_Layers - 3][channel]
-        Y = torch.add(torch.matmul(out, self.w_last), self.b_last)
-        return Y
-
     # PDE part
     def he_net(self, X):
         # Equation
@@ -263,12 +240,6 @@ class BsPINN(nn.Module):
 
     def data_transfer(self, min_loss):
         self.min_loss = min_loss
-
-    # Predict the image of a specific channel
-    def predict_channel(self, X, channel):
-        u_pred = self.neural_net_channel(X, channel)
-        u_pred = u_pred.cpu().detach().numpy()
-        return u_pred
 
     # Calculate relative error
     def rel_error(self):
