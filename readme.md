@@ -15,7 +15,7 @@ modulus 22.09
 ```
 
 # How to run the program
-Run the program in the "python" folder in each equation folder, where `*_PINN.py` means using PINN to solve the equation, `*_BsPINN.py` means using BsPINN to solve the equation. 
+Run the program in the "python" folder in each equation folder, where `*_BsPINN.py` means using BsPINN to solve the equation, `*_FourierBsPINN.py` means using FourierBsPINN to solve the equation. 
 
 # Results
 Network models, images and other files obtained from the program will be saved in a `output_*` folder in the directory where the python program is located.
