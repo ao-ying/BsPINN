@@ -1,7 +1,6 @@
 import os
 import numpy as np
 from matplotlib import pyplot as plt
-from scipy.interpolate import griddata
 import time
 import torch
 import torch.nn as nn                     # neural networks
@@ -29,25 +28,24 @@ def grad(f,x):
 
 # Output model parameter information
 def get_parameter_number(net):
-    total_num = sum(p.numel() for p in net.params)
     trainable_num = sum(p.numel() for p in net.params if p.requires_grad)
     return trainable_num
 
 # Generate dataset
-# num_domain: number of training data points, num_boundary: four times of this is the number of boundary sampling points, dim_test: number of sampling points on one edge of the test set.
+# num_domain: number of training data points, num_boundary: four times of this is the number of boundary sampling points. dim_test: number of sampling points on one edge of the test set.
 def load_data(num_domain, num_boundary, dim_test, lb_geom, ub_geom):
     # Generate training sampling points
     delta = 0.01
     X_train = np.random.uniform([lb_geom + delta, lb_geom + delta], [ub_geom - delta, ub_geom - delta], (num_domain, 2))
     # Boundary
     num_boundary_per_edge = int(num_boundary / 4)
-    points = np.linspace([lb_geom,lb_geom],[ub_geom,lb_geom],num_boundary_per_edge,endpoint=False) # Bottom
+    points = np.linspace([lb_geom,lb_geom],[ub_geom,lb_geom],num_boundary_per_edge,endpoint=False) # 下
     X_train = np.r_[X_train, points]
-    points = np.linspace([ub_geom,lb_geom],[ub_geom,ub_geom],num_boundary_per_edge,endpoint=False) # Right
+    points = np.linspace([ub_geom,lb_geom],[ub_geom,ub_geom],num_boundary_per_edge,endpoint=False) # 右
     X_train = np.r_[X_train, points]
-    points = np.linspace([lb_geom,lb_geom],[lb_geom,ub_geom],num_boundary_per_edge,endpoint=False) # Left
+    points = np.linspace([lb_geom,lb_geom],[lb_geom,ub_geom],num_boundary_per_edge,endpoint=False) # 左
     X_train = np.r_[X_train, points]
-    points = np.linspace([lb_geom,ub_geom],[ub_geom,ub_geom],num_boundary_per_edge,endpoint=False) # Top
+    points = np.linspace([lb_geom,ub_geom],[ub_geom,ub_geom],num_boundary_per_edge,endpoint=False) # 上
     X_train = np.r_[X_train, points]
 
     # Test set
@@ -61,7 +59,6 @@ def load_data(num_domain, num_boundary, dim_test, lb_geom, ub_geom):
     Y_test = np.reshape(Y_test, (Y_test.shape[0], 1))
 
     return X_train, X_test, Y_test
-
 
 class BsPINN(nn.Module):
     def __init__(self, Layers, k0, num_domain, boundary_weight, lb_X, ub_X):
@@ -139,7 +136,7 @@ class BsPINN(nn.Module):
     def construct_mask(self):
         masks = []
         for l in range(2, self.num_Layers - 2):
-            # Calculate block matrix dimensions
+            # 计算块矩阵维度
             num_blocks = int(pow(2, l - 1))
             blocksize1 = int(self.width[l] / num_blocks)
             blocksize2 = 2 * self.Layers[l + 1]
@@ -228,7 +225,7 @@ class BsPINN(nn.Module):
 
 # main function
 if __name__ == "__main__":
-    seeds = [17]
+    seeds = [36]
     csv_data = []
     for seed in seeds:
         # Set random seed
@@ -237,33 +234,32 @@ if __name__ == "__main__":
         # Parameter settings
         ## Neural network related
         train = True
-        name = "512-32_v16"
-        epochs = 50000 # Number of iterations for adam optimizer
-        num_domain = 60000 # Number of training points within the solution domain
-        num_boundary = 5000 # Number of boundary condition training points
+        name = "256-16_v7"
+        epochs = 40000 # Number of iterations for adam optimizer
+        num_domain = 6561 # Number of training points within the solution domain
+        num_boundary = 320 # Number of boundary condition training points
         dim_test = 500 
-        Layers = [2, 512, 256, 128, 64, 32, 1]
-        learning_rate = 0.01 
+        Layers = [2, 256, 128, 64, 32, 16, 1]
+        learning_rate = 0.001
         shuffle = False
-        boundary_weight = 1
-        patience = 2500 
+        boundary_weight = 100
+        patience = max(10, epochs / 10)
         weight_decay = 0
         
         ## Equation related
         lb_geom = 0
         ub_geom = 1
-        kappa = 24 * np.pi # kappa value
+        kappa = 8 * np.pi # kappa value
         
         ## Plot related
         align = False 
-        lb_loss = 4e2
-        ub_loss = 1e9
-        lb_u = -1.85
-        ub_u = 1.85
-        lb_error = 0.2
-        ub_error = 1.1
+        lb_loss = 1e-2
+        ub_loss = 1e6
+        lb_u = -1.7
+        ub_u = 1.7
+        lb_error = 3e-2
+        ub_error = 2e0
         error_param = 5 # Plot (20 * error_param) error points, epochs should be divisible by (20 * error_param).
-        record_time = True
         
         # Auxiliary variables
         name = name + ("_%d" % epochs)
@@ -275,8 +271,6 @@ if __name__ == "__main__":
         if not os.path.exists(output_path): os.mkdir(output_path)
         output_path = path + ('./output_BsPINN/%s/train_%d/' % (name, seed))
         if not os.path.exists(output_path): os.mkdir(output_path)
-        if record_time:
-            time_messsage = []
 
         if train:
             # Generate dataset
@@ -332,9 +326,6 @@ if __name__ == "__main__":
                 if (it + 1) % (epochs/20/error_param) == 0:
                     u_L2RE = model.rel_error()
                     error_list.append(u_L2RE)
-                    if record_time:
-                        current_time = time.time()
-                        time_messsage.append([current_time - start, loss_val, u_L2RE])
 
                 # Output
                 if (it + 1) % (epochs/20) == 0:
@@ -347,12 +338,11 @@ if __name__ == "__main__":
             min_loss = np.min(loss_list)
             np.savetxt(output_path + "error.txt", error_list, fmt="%s",delimiter=' ')
             print("Min train loss: %.8f" % min_loss)
-            if record_time:
-                np.savetxt(output_path + "time_message.txt", time_messsage, fmt="%s",delimiter=' ')
         torch.cuda.empty_cache() # Release GPU memory
         
         # save loss curve
         loss_list = np.loadtxt(output_path + "loss.txt", dtype = float, delimiter=' ')
+        fig, ax = plt.subplots()
         plt.semilogy(loss_list)
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
@@ -375,31 +365,6 @@ if __name__ == "__main__":
             plt.savefig(output_path + 'error_aligned.pdf', format="pdf", dpi=300, bbox_inches="tight")
         else:
             plt.savefig(output_path + 'error.pdf', format="pdf", dpi=300, bbox_inches="tight")
-            
-        # record time related information
-        if record_time:
-            time_message = np.loadtxt(output_path + "time_message.txt", dtype = float, delimiter=' ')
-            # time-loss curve
-            fig, ax = plt.subplots()
-            plt.semilogy(time_message[:,0], time_message[:,1])
-            plt.xlabel('Time')
-            plt.ylabel('Loss')
-            if align:
-                plt.ylim(lb_loss, ub_loss) 
-                plt.savefig(output_path + 'time_loss_aligned.pdf', format="pdf", dpi=100, bbox_inches="tight")
-            else:
-                plt.savefig(output_path + 'time_loss.pdf', format="pdf", dpi=100, bbox_inches="tight")
-                
-            # time-error curve
-            fig, ax = plt.subplots()
-            plt.semilogy(time_message[:,0], time_message[:,2])
-            plt.xlabel('Time')
-            plt.ylabel('Relative error')
-            if align:
-                plt.ylim(lb_loss, ub_loss)
-                plt.savefig(output_path + 'time_error_aligned.pdf', format="pdf", dpi=100, bbox_inches="tight")
-            else:
-                plt.savefig(output_path + 'time_error.pdf', format="pdf", dpi=100, bbox_inches="tight")
 
         # Calculate relative error
         dim = dim_test
@@ -420,6 +385,8 @@ if __name__ == "__main__":
 
         # Plot predicted solution
         fig, ax = plt.subplots()
+        u_pred[u_pred > ub_u] = ub_u - 1e-8
+        u_pred[u_pred < lb_u] = lb_u + 1e-8
         if align:
                 levels = np.arange(lb_u, ub_u + 1e-8, (ub_u - lb_u) / 100)
         else:
@@ -430,7 +397,7 @@ if __name__ == "__main__":
         plt.ylabel('$y$')
         plt.title('$u$(BsPINN)')
         if align:
-            plt.savefig(output_path + "highhe_u_bspinn.png", format="png", dpi=300, bbox_inches="tight")
+            plt.savefig(output_path + "lowhe_u_bspinn.png", format="png", dpi=300, bbox_inches="tight")
         else:
             plt.savefig(output_path + "u_pred.png", format="png", dpi=300, bbox_inches="tight")
             
