@@ -62,7 +62,7 @@ class BsPINN(nn.Module):
         self.params = []
         self.act = torch.sin
         self.num_Layers = len(self.Layers)
-        # Related to binary network
+        # BsNN Related
         self.width = [Layers[0]] + [int(pow(2, i - 1) * Layers[i]) for i in range(1,len(Layers) - 1)] + [Layers[-1]] 
         self.masks = self.construct_mask()
         self.num_param = self.cal_param()
@@ -90,7 +90,7 @@ class BsPINN(nn.Module):
             masks.append(mask)
         return masks
     
-    # Initialize binary network parameters
+    # Initialize BsNN parameters
     def initialize_NN(self, Layers):                     
         weights = []
         biases = []
@@ -140,7 +140,7 @@ class BsPINN(nn.Module):
         X = 2.0 * (X - self.lb_X) / (self.ub_X - self.lb_X) - 1.0
         X = X.float()
 
-        # First hidden layer
+        # BsNN part
         for l in range(0, self.num_Layers - 2):
             if l >=2 and l <= self.num_Layers - 3:
                 W = self.weights[l]
@@ -181,7 +181,6 @@ class BsPINN(nn.Module):
         y_b = y[self.num_domain:].clone()
         z_b = z[self.num_domain:].clone()
         u_b = self.neural_net(torch.cat([x_b, y_b, z_b], dim = 1))
-        # dvalue = torch.sin(self.kappa * x_b) * torch.sin(self.kappa * y_b) * torch.sin(self.kappa * z_b)
         dvalue = Y_train[self.num_domain:]
         boundary = u_b - dvalue
 
