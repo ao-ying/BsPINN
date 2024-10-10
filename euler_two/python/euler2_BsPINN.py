@@ -107,7 +107,7 @@ class BsPINN(nn.Module):
         self.N0 = N0
         self.Nb = Nb
         self.act = torch.tanh
-        self.lens = accsum([Nf, N0, Nb, Nb, Nb, Nb])
+        self.lens = accsum([Nf, N0, int(Nb / 4), int(Nb / 4), int(Nb / 4), int(Nb / 4)])
         self.initial_weight = initial_weight
         self.boundary_weight = boundary_weight
         self.params = []
@@ -286,7 +286,7 @@ class BsPINN(nn.Module):
         for i in range(len(initials)): loss_i += torch.mean(torch.pow(initials[i], 2))
         loss_b = 0
         for i in range(len(boundarys)): loss_b += torch.mean(torch.pow(boundarys[i], 2))
-        loss_all = loss_e + self.initial_weight * loss_i + self.boundary_weight * loss_i
+        loss_all = loss_e + self.initial_weight * loss_i + self.boundary_weight * loss_b
 
         return loss_all
 
