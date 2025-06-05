@@ -276,7 +276,7 @@ if __name__ == "__main__":
         output_path = path + ('./output_BsPINN/%s/train_%d/' % (name, seed))
         if not os.path.exists(output_path): os.mkdir(output_path)
         if record_time:
-            time_messsage = []
+            time_message = []
 
         if train:
             # Generate dataset
@@ -334,7 +334,7 @@ if __name__ == "__main__":
                     error_list.append(u_L2RE)
                     if record_time:
                         current_time = time.time()
-                        time_messsage.append([current_time - start, loss_val, u_L2RE])
+                        time_message.append([current_time - start, loss_val, u_L2RE])
 
                 # Output
                 if (it + 1) % (epochs/20) == 0:
@@ -348,7 +348,7 @@ if __name__ == "__main__":
             np.savetxt(output_path + "error.txt", error_list, fmt="%s",delimiter=' ')
             print("Min train loss: %.8f" % min_loss)
             if record_time:
-                np.savetxt(output_path + "time_message.txt", time_messsage, fmt="%s",delimiter=' ')
+                np.savetxt(output_path + "time_message.txt", time_message, fmt="%s",delimiter=' ')
         torch.cuda.empty_cache() # Release GPU memory
         
         # save loss curve
@@ -396,7 +396,7 @@ if __name__ == "__main__":
             plt.xlabel('Time')
             plt.ylabel('Relative error')
             if align:
-                plt.ylim(lb_loss, ub_loss)
+                plt.ylim(lb_error, ub_error)
                 plt.savefig(output_path + 'time_error_aligned.pdf', format="pdf", dpi=100, bbox_inches="tight")
             else:
                 plt.savefig(output_path + 'time_error.pdf', format="pdf", dpi=100, bbox_inches="tight")
